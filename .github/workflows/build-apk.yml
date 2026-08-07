@@ -60,6 +60,29 @@ jobs:
           fi
           echo "Confirmed keystore exists at $KEYSTORE_PATH."
 
+          # Ensure debug.keystore required by app/build.gradle.kts exists
+          if [ ! -f "./debug.keystore" ]; then
+            echo "Generating debug.keystore for build configuration..."
+            keytool -genkeypair -v \
+              -keystore "./debug.keystore" \
+              -storepass "android" \
+              -alias "androiddebugkey" \
+              -keypass "android" \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+
+          # Ensure .env required by secrets gradle plugin exists
+          if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
       - name: Build System Monitor APK
         run: |
           gradle :app:assembleDebug --stacktrace --no-daemon
