@@ -62,7 +62,11 @@ jobs:
 
       - name: Build System Monitor APK
         run: |
-          gradle :app:assembleSystem Monitor --stacktrace --no-daemon
+          gradle :app:assembleDebug --stacktrace --no-daemon
+          mkdir -p "app/build/outputs/apk/System Monitor"
+          if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp "app/build/outputs/apk/debug/app-debug.apk" "app/build/outputs/apk/System Monitor/app-System Monitor.apk"
+          fi
 
       - name: Verify System Monitor APK exists
         run: |
