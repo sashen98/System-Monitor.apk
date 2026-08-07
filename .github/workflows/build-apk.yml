@@ -1,0 +1,88 @@
+name: Build System Monitor APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Verify Java environment
+        run: |
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+          JAVA_MAJOR=$(java -version 2>&1 | head -n 1 | cut -d'"' -f2 | cut -d'.' -f1)
+          if [ "$JAVA_MAJOR" -lt 17 ]; then
+            echo "Error: Java major version is $JAVA_MAJOR, which is lower than 17."
+            exit 1
+          fi
+          echo "Confirmed Java major version is $JAVA_MAJOR (>= 17)."
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Create temporary System Monitor keystore
+        run: |
+          KEYSTORE_PATH="./System Monitor.keystore"
+          if [ -f "$KEYSTORE_PATH" ]; then
+            echo "Keystore already exists at $KEYSTORE_PATH."
+          else
+            echo "Generating temporary keystore at $KEYSTORE_PATH..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass "android" \
+              -alias "androidSystem Monitorkey" \
+              -keypass "android" \
+              -dname "CN=Android System Monitor,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Error: Failed to create keystore at $KEYSTORE_PATH."
+            exit 1
+          fi
+          echo "Confirmed keystore exists at $KEYSTORE_PATH."
+
+      - name: Build System Monitor APK
+        run: |
+          gradle :app:assembleSystem Monitor --stacktrace --no-daemon
+
+      - name: Verify System Monitor APK exists
+        run: |
+          EXPECTED_APK="app/build/outputs/apk/System Monitor/app-System Monitor.apk"
+          if [ -f "$EXPECTED_APK" ]; then
+            echo "Verified expected APK exists at $EXPECTED_APK."
+          else
+            echo "Expected APK not found at $EXPECTED_APK. Searching inside app/build/outputs/apk..."
+            if [ -d "app/build/outputs/apk" ]; then
+              find app/build/outputs/apk -type f -name "*.apk"
+            else
+              echo "Directory app/build/outputs/apk does not exist."
+            fi
+            echo "Error: System Monitor APK does not exist."
+            exit 1
+          fi
+
+      - name: Upload System Monitor APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-System Monitor-apk
+          path: app/build/outputs/apk/System Monitor/app-System Monitor.apk
+          if-no-files-found: error

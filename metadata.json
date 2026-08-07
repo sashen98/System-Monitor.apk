@@ -1,0 +1,6 @@
+{
+  "name": "System Monitor",
+  "description": "Real-time system monitor & hardware dashboard providing live stats on battery, temperature, memory, storage, time, calendar, and active apps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
