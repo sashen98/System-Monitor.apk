@@ -24,7 +24,10 @@ data class MemoryInfo(
     val availableRamBytes: Long = 0L,
     val usedRamBytes: Long = 0L,
     val usagePercentage: Int = 0,
-    val isLowMemory: Boolean = false
+    val isLowMemory: Boolean = false,
+    val isOptimizing: Boolean = false,
+    val lastFreedMb: Int = 0,
+    val isOptimized: Boolean = false
 )
 
 data class StorageInfo(
@@ -69,5 +72,8 @@ data class SystemMetricsState(
     val activeApps: List<AppUsageInfo> = emptyList(),
     val hasUsageStatsPermission: Boolean = false,
     val selectedTempUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isOverheating: Boolean = false,
+    val isSimulatedOverheat: Boolean = false,
+    val statusMessage: String? = null
 )

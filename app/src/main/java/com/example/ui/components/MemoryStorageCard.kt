@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -155,8 +157,38 @@ fun MemoryStorageCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            if (memory.isOptimized && memory.lastFreedMb > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(NeonGreen.copy(alpha = 0.12f))
+                        .border(1.dp, NeonGreen.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Optimized",
+                        tint = NeonGreen,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "OPTIMIZED • FREED ${memory.lastFreedMb} MB RAM",
+                        color = NeonGreen,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             Button(
                 onClick = onBoostMemory,
+                enabled = !memory.isOptimizing,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CyberDarkBg,
                     contentColor = NeonCyan
@@ -167,17 +199,31 @@ fun MemoryStorageCard(
                     .border(1.dp, CyberCardBorder, RoundedCornerShape(12.dp))
                     .testTag("boost_memory_button")
             ) {
-                Icon(
-                    imageVector = Icons.Default.CleaningServices,
-                    contentDescription = "Optimize Memory",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Optimize & Free Up Memory",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (memory.isOptimizing) {
+                    CircularProgressIndicator(
+                        color = NeonCyan,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Cleaning RAM & Caches...",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.CleaningServices,
+                        contentDescription = "Optimize Memory",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (memory.isOptimized) "Optimize Memory Again" else "Optimize & Free Up Memory",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

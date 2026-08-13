@@ -21,6 +21,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import com.example.util.NotificationHelper
+
 class SystemMonitorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
@@ -40,8 +42,10 @@ class SystemMonitorViewModel(application: Application) : AndroidViewModel(applic
     private val dateFormat = SimpleDateFormat("EEEE, MMM d, yyyy", Locale.getDefault())
 
     private var snapshotCounter = 0
+    private var notificationSentForCurrentEpisode = false
 
     init {
+        NotificationHelper.createNotificationChannel(application)
         startRealtimeMonitoring()
     }
 
@@ -59,13 +63,37 @@ class SystemMonitorViewModel(application: Application) : AndroidViewModel(applic
         val formattedTime = timeFormat.format(now)
         val formattedDate = dateFormat.format(now)
 
-        val battery = repository.getBatteryInfo()
-        val thermal = repository.getThermalInfo(battery.tempCelsius)
+        val rawBattery = repository.getBatteryInfo()
+        val currentState = _uiState.value
+
+        // Adjust battery temp if simulated overheat is on
+        val effectiveTemp = if (currentState.isSimulatedOverheat) {
+            43.5f
+        } else {
+            rawBattery.tempCelsius
+        }
+
+        val battery = if (currentState.isSimulatedOverheat) {
+            rawBattery.copy(tempCelsius = effectiveTemp, healthStatus = "Overheat")
+        } else {
+            rawBattery
+        }
+
+        val thermal = repository.getThermalInfo(effectiveTemp)
         val memory = repository.getMemoryInfo()
         val storage = repository.getStorageInfo()
         val system = repository.getSystemInfo()
         val hasUsagePermission = repository.hasUsageStatsPermission()
         val recentApps = repository.getRecentApps()
+
+        val isOverheatDetected = effectiveTemp >= 40f || thermal.statusLevel >= 2 || battery.healthStatus == "Overheat"
+
+        if (isOverheatDetected && !notificationSentForCurrentEpisode) {
+            notificationSentForCurrentEpisode = true
+            NotificationHelper.showOverheatNotification(getApplication(), effectiveTemp)
+        } else if (!isOverheatDetected) {
+            notificationSentForCurrentEpisode = false
+        }
 
         _uiState.update { current ->
             current.copy(
@@ -73,11 +101,12 @@ class SystemMonitorViewModel(application: Application) : AndroidViewModel(applic
                 liveDateFormatted = formattedDate,
                 battery = battery,
                 thermal = thermal,
-                memory = memory,
+                memory = memory.copy(isOptimizing = current.memory.isOptimizing),
                 storage = storage,
                 system = system,
                 activeApps = recentApps,
                 hasUsageStatsPermission = hasUsagePermission,
+                isOverheating = isOverheatDetected,
                 isLoading = false
             )
         }
@@ -107,11 +136,30 @@ class SystemMonitorViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun toggleSimulateOverheat() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { current ->
+                val nextSimulated = !current.isSimulatedOverheat
+                current.copy(
+                    isSimulatedOverheat = nextSimulated,
+                    statusMessage = if (nextSimulated) "Simulated Overheat Activated! Check Notification." else "Normal Temperature Restored"
+                )
+            }
+            if (_uiState.value.isSimulatedOverheat) {
+                notificationSentForCurrentEpisode = false
+            }
+            refreshMetricsInternal()
+        }
+    }
+
+    fun dismissStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
+    }
+
     fun refreshManually() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
             refreshMetricsInternal()
-            // Save manual snapshot
             val state = _uiState.value
             repository.saveSnapshot(
                 batteryLevel = state.battery.level,
@@ -125,9 +173,24 @@ class SystemMonitorViewModel(application: Application) : AndroidViewModel(applic
 
     fun boostMemory() {
         viewModelScope.launch(Dispatchers.IO) {
-            System.gc()
-            delay(300)
+            _uiState.update { current ->
+                current.copy(memory = current.memory.copy(isOptimizing = true))
+            }
+            
+            delay(500L) // Show optimizing animation
+            val freedMb = repository.boostAndCleanMemory()
             refreshMetricsInternal()
+
+            _uiState.update { current ->
+                current.copy(
+                    memory = current.memory.copy(
+                        isOptimizing = false,
+                        lastFreedMb = freedMb,
+                        isOptimized = true
+                    ),
+                    statusMessage = "Memory Optimized! Freed $freedMb MB RAM."
+                )
+            }
         }
     }
 }
